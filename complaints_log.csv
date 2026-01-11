@@ -1,10 +1,1 @@
-ID,Complaint,Category,Urgency,Status
-1,water problem is too high in hostel,Hostel,Low,Pending
-2,water problem is too high in hostel,Hostel,High,Pending
-3,water problem is too high in hostel,Hostel,High,Pending
-4,"There is no water in hostel
-",Hostel,High,Pending
-5,food is not good,Hostel,Medium,Pending
-6,,Academics,Low,Pending
-7,id card is not issued,Administration,Low,Pending
-8,academic calender is not yet released,Academics,Low,Pending
+
