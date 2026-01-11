@@ -123,10 +123,10 @@ else:
         pd.DataFrame(columns=["ID","Username","Complaint","Category","Urgency","Status"]).to_csv(file,index=False)
 
 try:
-    df = pd.read_csv(file)
+    pd.read_csv("complaints_log.csv")
 except:
     df = pd.DataFrame(columns=["ID","Username","Complaint","Category","Urgency","Status"])
-    df.to_csv(file, index=False)
+    df.to_csv("complaints_log.csv", index=False)
 
 
 
@@ -150,7 +150,7 @@ except:
                 "Urgency":urgency,
                 "Status":"Pending"
             }])], ignore_index=True)
-            df.to_csv(file,index=False)
+            df.to_csv("complaints_log.csv", index=False)
 
             st.success("Complaint Submitted")
             st.write("Category:",category)
@@ -179,7 +179,7 @@ except:
                                   key=i)
             df.loc[i,"Status"] = status
 
-        df.to_csv(file,index=False)
+        df.to_csv("complaints_log.csv", index=False)
 
         st.subheader("📊 Analytics")
         st.bar_chart(df["Category"].value_counts())
