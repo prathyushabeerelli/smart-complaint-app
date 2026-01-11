@@ -12,6 +12,30 @@ from textblob import TextBlob
 
 nltk.download("stopwords")
 
+# ================= CONFIG =================
+st.set_page_config("Smart Complaint System", layout="wide")
+
+USERS_FILE = "users.csv"
+COMPLAINT_FILE = "complaints_log.csv"
+
+# ================= FILE SAFETY =================
+if not os.path.exists(USERS_FILE):
+    pd.DataFrame(columns=["username","password","role"]).to_csv(USERS_FILE,index=False)
+
+if not os.path.exists(COMPLAINT_FILE):
+    pd.DataFrame(columns=["ID","Username","Complaint","Category","Urgency","Status"]).to_csv(COMPLAINT_FILE,index=False)
+
+def load_complaints():
+    try:
+        df = pd.read_csv(COMPLAINT_FILE)
+        if df.empty:
+            raise Exception
+        return df
+    except:
+        df = pd.DataFrame(columns=["ID","Username","Complaint","Category","Urgency","Status"])
+        df.to_csv(COMPLAINT_FILE,index=False)
+        return df
+
 # ================= EMAIL =================
 def send_email(complaint, category, urgency):
     sender = st.secrets["EMAIL"]
@@ -35,15 +59,13 @@ Urgency: {urgency}
     server.quit()
 
 # ================= NLP =================
-model = pickle.load(open("model.pkl", "rb"))
-vectorizer = pickle.load(open("vectorizer.pkl", "rb"))
+model = pickle.load(open("model.pkl","rb"))
+vectorizer = pickle.load(open("vectorizer.pkl","rb"))
 stemmer = PorterStemmer()
 
 def clean_text(text):
-    text = re.sub("[^a-zA-Z]", " ", text)
-    text = text.lower()
-    words = text.split()
-    words = [stemmer.stem(w) for w in words if w not in stopwords.words("english")]
+    text = re.sub("[^a-zA-Z]"," ",text).lower()
+    words = [stemmer.stem(w) for w in text.split() if w not in stopwords.words("english")]
     return " ".join(words)
 
 def get_urgency(text):
@@ -60,34 +82,13 @@ def get_urgency(text):
     else:
         return "Low"
 
-# ================= FILE SETUP =================
-users_file = "users.csv"
-complaint_file = "complaints_log.csv"
-
-if not os.path.exists(users_file):
-    pd.DataFrame(columns=["username","password","role"]).to_csv(users_file,index=False)
-
-if not os.path.exists(complaint_file):
-    pd.DataFrame(columns=["ID","Username","Complaint","Category","Urgency","Status"]).to_csv(complaint_file,index=False)
-
-# ================= SAFE CSV READ =================
-def load_complaints():
-    try:
-        return pd.read_csv(complaint_file)
-    except:
-        df = pd.DataFrame(columns=["ID","Username","Complaint","Category","Urgency","Status"])
-        df.to_csv(complaint_file,index=False)
-        return df
-
-# ================= UI =================
-st.set_page_config("Smart Complaint System", layout="wide")
-
+# ================= SESSION =================
 if "login" not in st.session_state:
     st.session_state.login = False
-    st.session_state.role = ""
     st.session_state.username = ""
+    st.session_state.role = ""
 
-users = pd.read_csv(users_file)
+users = pd.read_csv(USERS_FILE)
 
 # ================= LOGIN =================
 if not st.session_state.login:
@@ -101,67 +102,75 @@ if not st.session_state.login:
 
         if st.button("Login"):
             user = users[(users["username"]==u) & (users["password"]==p)]
-            if len(user)>0:
-                st.session_state.login=True
-                st.session_state.role=user.iloc[0]["role"].strip().lower()
-                st.session_state.username=u
+            if len(user) > 0:
+                st.session_state.login = True
+                st.session_state.username = u
+                st.session_state.role = user.iloc[0]["role"]
                 st.rerun()
             else:
-                st.error("Invalid login")
+                st.error("Invalid credentials")
 
     else:
         u = st.text_input("Create Username")
         p = st.text_input("Create Password", type="password")
+        r = st.selectbox("Role", ["student","admin"])
 
         if st.button("Register"):
             if u in users["username"].values:
-                st.error("Username exists")
+                st.error("Username already exists")
             else:
-                users = pd.concat([users,pd.DataFrame([{"username":u,"password":p,"role":"student"}])])
-                users.to_csv(users_file,index=False)
-                st.success("Registered. Now login.")
+                users = pd.concat([users, pd.DataFrame([{
+                    "username":u,
+                    "password":p,
+                    "role":r
+                }])], ignore_index=True)
+                users.to_csv(USERS_FILE,index=False)
+                st.success("Account created. Now login.")
 
 # ================= DASHBOARD =================
 else:
-    st.sidebar.success(st.session_state.username)
+    st.sidebar.success(f"Logged in as {st.session_state.username}")
     if st.sidebar.button("Logout"):
         st.session_state.login=False
-        st.session_state.role=""
         st.session_state.username=""
+        st.session_state.role=""
         st.rerun()
 
     df = load_complaints()
 
     # ---------- STUDENT ----------
-    if st.session_state.role=="student":
+    if st.session_state.role == "student":
         st.header("🧑‍🎓 Student Portal")
 
         complaint = st.text_area("Enter complaint")
 
-        if st.button("Submit"):
-            cleaned = clean_text(complaint)
-            category = model.predict(vectorizer.transform([cleaned]))[0]
-            urgency = get_urgency(complaint)
+        if st.button("Submit Complaint"):
+            if complaint.strip()=="":
+                st.warning("Please enter a complaint")
+            else:
+                cleaned = clean_text(complaint)
+                category = model.predict(vectorizer.transform([cleaned]))[0]
+                urgency = get_urgency(complaint)
 
-            new_id = len(df)+1
-            df = pd.concat([df,pd.DataFrame([{
-                "ID":new_id,
-                "Username":st.session_state.username,
-                "Complaint":complaint,
-                "Category":category,
-                "Urgency":urgency,
-                "Status":"Pending"
-            }])])
+                new_id = len(df)+1
+                df = pd.concat([df, pd.DataFrame([{
+                    "ID":new_id,
+                    "Username":st.session_state.username,
+                    "Complaint":complaint,
+                    "Category":category,
+                    "Urgency":urgency,
+                    "Status":"Pending"
+                }])], ignore_index=True)
 
-            df.to_csv(complaint_file,index=False)
+                df.to_csv(COMPLAINT_FILE,index=False)
 
-            st.success("Complaint Submitted")
-            st.write("Category:",category)
-            st.write("Urgency:",urgency)
+                st.success("Complaint submitted")
+                st.write("Category:",category)
+                st.write("Urgency:",urgency)
 
-            if urgency=="High":
-                send_email(complaint,category,urgency)
-                st.info("📧 Admin notified")
+                if urgency=="High":
+                    send_email(complaint,category,urgency)
+                    st.info("📧 Admin notified")
 
         st.subheader("📄 My Complaints")
         st.dataframe(df[df["Username"]==st.session_state.username], use_container_width=True)
@@ -177,12 +186,16 @@ else:
             st.write("Category:",df.loc[i,"Category"])
             st.write("Urgency:",df.loc[i,"Urgency"])
 
-            status = st.selectbox("Status",["Pending","In Progress","Solved"],
-                                  index=["Pending","In Progress","Solved"].index(df.loc[i,"Status"]),
-                                  key=i)
-            df.loc[i,"Status"]=status
+            status = st.selectbox(
+                "Status",
+                ["Pending","In Progress","Solved"],
+                index=["Pending","In Progress","Solved"].index(df.loc[i,"Status"]),
+                key=f"status_{i}"
+            )
 
-        df.to_csv(complaint_file,index=False)
+            df.loc[i,"Status"] = status
+
+        df.to_csv(COMPLAINT_FILE,index=False)
 
         st.subheader("📊 Analytics")
         st.bar_chart(df["Category"].value_counts())
