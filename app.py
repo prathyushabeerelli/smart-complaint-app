@@ -122,7 +122,12 @@ else:
     if not os.path.exists(file):
         pd.DataFrame(columns=["ID","Username","Complaint","Category","Urgency","Status"]).to_csv(file,index=False)
 
+try:
     df = pd.read_csv(file)
+except:
+    df = pd.DataFrame(columns=["ID","Username","Complaint","Category","Urgency","Status"])
+    df.to_csv(file, index=False)
+
 
     # ---------- STUDENT ----------
     if st.session_state.role=="student":
