@@ -153,6 +153,7 @@ if not st.session_state.login:
         if len(user) > 0:
             st.session_state.login = True
             st.session_state.role = user.iloc[0]["role"]
+            st.session_state.username = user.iloc[0]["username"]
             st.rerun()
         else:
             st.error("Invalid username or password")
@@ -204,12 +205,19 @@ else:
             df.to_csv(file, index=False)
 
             st.success("Complaint Submitted")
-            if urgency == "High":
+            st.success("Complaint Submitted")
+
+if urgency.strip().lower() == "high":
+    try:
+        send_email(complaint, category, urgency)
+        st.info("📧 Admin notified by email")
+    except Exception as e:
+        st.error("Email failed to send")
+        if urgency == "High":
                 send_email(complaint, category, urgency)
                 st.info("📧 Admin notified by email")
-
-            st.write("📌 Category:", category)
-            st.write("⚠️ Urgency:", urgency)
+                st.write("📌 Category:", category)
+                st.write("⚠️ Urgency:", urgency)
 
     # --------- ADMIN ----------
     if menu == "Admin Dashboard" and st.session_state.role == "admin":
