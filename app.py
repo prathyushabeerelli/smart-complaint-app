@@ -1,3 +1,5 @@
+import smtplib
+from email.mime.text import MIMEText
 import streamlit as st
 import pandas as pd
 import pickle
@@ -7,6 +9,27 @@ import os
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 from textblob import TextBlob
+def send_email(complaint, category, urgency):
+    sender = st.secrets["EMAIL"]
+    password = st.secrets["PASSWORD"]
+    receiver = sender
+
+    msg = MIMEText(f"""
+New High Urgency Complaint Received
+
+Complaint: {complaint}
+Category: {category}
+Urgency: {urgency}
+""")
+
+    msg["Subject"] = "🚨 High Urgency Student Complaint"
+    msg["From"] = sender
+    msg["To"] = receiver
+
+    server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+    server.login(sender, password)
+    server.send_message(msg)
+    server.quit()
 
 st.set_page_config(page_title="Smart Complaint System", layout="wide")
 if "theme" not in st.session_state:
@@ -98,6 +121,7 @@ if not st.session_state.login:
             if len(user) > 0:
                 st.session_state.login = True
                 st.session_state.role = user.iloc[0]["role"]
+                st.session_state.username = username
                 st.rerun()
             else:
                 st.error("Invalid username or password")
@@ -135,7 +159,10 @@ if not st.session_state.login:
 
 else:
     st.sidebar.markdown("### Navigation")
-    menu = st.sidebar.selectbox("Menu", ["Student Portal", "Admin Dashboard"])
+    if st.session_state.role == "admin":
+        menu = st.sidebar.selectbox("Menu", ["Admin Dashboard"])
+    else:
+        menu = st.sidebar.selectbox("Menu", ["Student Portal"])
 
     if st.sidebar.button("Logout"):
         st.session_state.login = False
@@ -162,19 +189,25 @@ else:
             else:
                 df = pd.DataFrame(columns=["ID","Complaint","Category","Urgency","Status"])
                 new_id = 1
+                
+                new_row = {
+                    "ID": new_id,
+                    "Username": st.session_state.username,
+                    "Complaint": complaint,
+                    "Category": category,
+                    "Urgency": urgency,
+                    "Status": "Pending"
+                    }
 
-            new_row = {
-                "ID": new_id,
-                "Complaint": complaint,
-                "Category": category,
-                "Urgency": urgency,
-                "Status": "Pending"
-            }
 
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
             df.to_csv(file, index=False)
 
             st.success("Complaint Submitted")
+            if urgency == "High":
+                send_email(complaint, category, urgency)
+                st.info("📧 Admin notified by email")
+
             st.write("📌 Category:", category)
             st.write("⚠️ Urgency:", urgency)
 
@@ -209,10 +242,15 @@ else:
         if new_status != current_status:
             df.loc[i,"Status"] = new_status
             df.to_csv("complaints_log.csv", index=False)
-            st.success("Status updated")
+            st.subheader("📄 My Complaints")
 
-    st.subheader("📊 Complaint Analytics")
-    st.bar_chart(df["Category"].value_counts())
+df = pd.read_csv("complaints_log.csv")
+my_data = df[df["Username"] == st.session_state.username]
+st.dataframe(my_data, use_container_width=True)
+st.success("Status updated")
 
-    st.subheader("🚨 High Urgency Complaints")
-    st.dataframe(df[df["Urgency"]=="High"], use_container_width=True)
+st.subheader("📊 Complaint Analytics")
+st.bar_chart(df["Category"].value_counts())
+
+st.subheader("🚨 High Urgency Complaints")
+st.dataframe(df[df["Urgency"]=="High"], use_container_width=True)
