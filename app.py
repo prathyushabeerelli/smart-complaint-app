@@ -15,6 +15,26 @@ nltk.download("stopwords")
 # ================= CONFIG =================
 st.set_page_config("Smart Complaint System", layout="wide")
 
+st.markdown("""
+<style>
+.card {
+    background: linear-gradient(135deg, #4f46e5, #9333ea);
+    padding: 20px;
+    border-radius: 16px;
+    color: white;
+    margin-bottom: 20px;
+}
+.metric {
+    font-size: 28px;
+    font-weight: bold;
+}
+.label {
+    font-size: 16px;
+    opacity: 0.9;
+}
+</style>
+""", unsafe_allow_html=True)
+
 USERS_FILE = "users.csv"
 COMPLAINT_FILE = "complaints_log.csv"
 
@@ -28,8 +48,6 @@ if not os.path.exists(COMPLAINT_FILE):
 def load_complaints():
     try:
         df = pd.read_csv(COMPLAINT_FILE)
-        if df.empty:
-            raise Exception
         return df
     except:
         df = pd.DataFrame(columns=["ID","Username","Complaint","Category","Urgency","Status"])
@@ -94,23 +112,29 @@ users = pd.read_csv(USERS_FILE)
 if not st.session_state.login:
     st.title("🔐 Smart Complaint Login")
 
-    choice = st.radio("Choose", ["Login","Register"])
+    role_choice = st.radio("Who are you?", ["Student", "Admin"])
+    action = st.radio("Choose", ["Login","Register"])
 
-    if choice == "Login":
+    if action == "Login":
         u = st.text_input("Username")
         p = st.text_input("Password", type="password")
 
         if st.button("Login"):
-            user = users[(users["username"]==u) & (users["password"]==p)]
+            user = users[
+                (users["username"] == u) &
+                (users["password"] == p) &
+                (users["role"].str.lower() == role_choice.lower())
+            ]
+
             if len(user) > 0:
                 st.session_state.login = True
                 st.session_state.username = u
-                st.session_state.role = user.iloc[0]["role"]
+                st.session_state.role = role_choice.lower()
                 st.rerun()
             else:
-                st.error("Invalid credentials")
+                st.error("Invalid username, password, or role")
 
-    else:
+    else:  # Register
         u = st.text_input("Create Username")
         p = st.text_input("Create Password", type="password")
         r = st.selectbox("Role", ["student","admin"])
@@ -120,9 +144,9 @@ if not st.session_state.login:
                 st.error("Username already exists")
             else:
                 users = pd.concat([users, pd.DataFrame([{
-                    "username":u,
-                    "password":p,
-                    "role":r
+                    "username": u,
+                    "password": p,
+                    "role": r
                 }])], ignore_index=True)
                 users.to_csv(USERS_FILE,index=False)
                 st.success("Account created. Now login.")
@@ -140,51 +164,66 @@ else:
 
     # ---------- STUDENT ----------
     if st.session_state.role == "student":
-        st.header("🧑‍🎓 Student Portal")
+        st.markdown("""
+        <div class="card">
+            <div class="metric">🧑‍🎓 Student Dashboard</div>
+            <div class="label">Submit and track your complaints</div>
+        </div>
+        """, unsafe_allow_html=True)
 
         complaint = st.text_area("Enter complaint")
 
         if st.button("Submit Complaint"):
-            if complaint.strip()=="":
+            if complaint.strip() == "":
                 st.warning("Please enter a complaint")
             else:
                 cleaned = clean_text(complaint)
                 category = model.predict(vectorizer.transform([cleaned]))[0]
                 urgency = get_urgency(complaint)
 
-                new_id = len(df)+1
+                new_id = len(df) + 1
                 df = pd.concat([df, pd.DataFrame([{
-                    "ID":new_id,
-                    "Username":st.session_state.username,
-                    "Complaint":complaint,
-                    "Category":category,
-                    "Urgency":urgency,
-                    "Status":"Pending"
+                    "ID": new_id,
+                    "Username": st.session_state.username,
+                    "Complaint": complaint,
+                    "Category": category,
+                    "Urgency": urgency,
+                    "Status": "Pending"
                 }])], ignore_index=True)
 
                 df.to_csv(COMPLAINT_FILE,index=False)
 
                 st.success("Complaint submitted")
-                st.write("Category:",category)
-                st.write("Urgency:",urgency)
+                st.write("Category:", category)
+                st.write("Urgency:", urgency)
 
-                if urgency=="High":
-                    send_email(complaint,category,urgency)
+                if urgency == "High":
+                    send_email(complaint, category, urgency)
                     st.info("📧 Admin notified")
 
         st.subheader("📄 My Complaints")
-        st.dataframe(df[df["Username"]==st.session_state.username], use_container_width=True)
+        st.dataframe(df[df["Username"] == st.session_state.username], use_container_width=True)
 
     # ---------- ADMIN ----------
     else:
-        st.header("🧑‍💼 Admin Dashboard")
+        st.markdown("""
+        <div class="card">
+            <div class="metric">🧑‍💼 Admin Control Panel</div>
+            <div class="label">Monitor and resolve student complaints</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Total Complaints", len(df))
+        col2.metric("High Urgency", len(df[df["Urgency"]=="High"]))
+        col3.metric("Pending", len(df[df["Status"]=="Pending"]))
 
         for i in range(len(df)):
             st.write("----")
-            st.write("User:",df.loc[i,"Username"])
-            st.write("Complaint:",df.loc[i,"Complaint"])
-            st.write("Category:",df.loc[i,"Category"])
-            st.write("Urgency:",df.loc[i,"Urgency"])
+            st.write("User:", df.loc[i,"Username"])
+            st.write("Complaint:", df.loc[i,"Complaint"])
+            st.write("Category:", df.loc[i,"Category"])
+            st.write("Urgency:", df.loc[i,"Urgency"])
 
             status = st.selectbox(
                 "Status",
