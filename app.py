@@ -12,47 +12,89 @@ from textblob import TextBlob
 
 nltk.download("stopwords")
 
-# ================= CONFIG =================
-st.set_page_config("Smart Complaint System", layout="wide")
+# ================= PAGE CONFIG =================
+st.set_page_config(
+    page_title="Smart Complaint System",
+    layout="wide",
+    page_icon="🎓"
+)
 
+# ================= STYLES =================
 st.markdown("""
 <style>
+
+/* App background */
+.stApp {
+    background: linear-gradient(to right, #fdfbfb, #ebedee);
+    font-family: 'Segoe UI', sans-serif;
+}
+
+/* Cards */
 .card {
-    background: linear-gradient(135deg, #4f46e5, #9333ea);
-    padding: 20px;
-    border-radius: 16px;
-    color: white;
-    margin-bottom: 20px;
+    padding: 25px;
+    border-radius: 20px;
+    margin-bottom: 25px;
+    color: #2c2c2c;
+    box-shadow: 0px 10px 25px rgba(0,0,0,0.08);
 }
+
+.student-card {
+    background: linear-gradient(135deg, #84fab0, #8fd3f4);
+}
+
+.admin-card {
+    background: linear-gradient(135deg, #a18cd1, #fbc2eb);
+}
+
+/* Headings */
 .metric {
-    font-size: 28px;
-    font-weight: bold;
+    font-size: 32px;
+    font-weight: 700;
 }
+
+/* Labels */
 .label {
     font-size: 16px;
     opacity: 0.9;
 }
+
+/* Buttons */
+.stButton > button {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border-radius: 12px;
+    height: 3em;
+    font-size: 16px;
+    border: none;
+}
+
+/* Inputs */
+.stTextInput input, .stTextArea textarea {
+    border-radius: 12px;
+    border: 1px solid #ddd;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
+# ================= FILE PATHS =================
 USERS_FILE = "users.csv"
 COMPLAINT_FILE = "complaints_log.csv"
 
 # ================= FILE SAFETY =================
 if not os.path.exists(USERS_FILE):
-    pd.DataFrame(columns=["username","password","role"]).to_csv(USERS_FILE,index=False)
+    pd.DataFrame(columns=["username", "password", "role"]).to_csv(USERS_FILE, index=False)
 
 if not os.path.exists(COMPLAINT_FILE):
-    pd.DataFrame(columns=["ID","Username","Complaint","Category","Urgency","Status"]).to_csv(COMPLAINT_FILE,index=False)
+    pd.DataFrame(
+        columns=["ID", "Username", "Complaint", "Category", "Urgency", "Status"]
+    ).to_csv(COMPLAINT_FILE, index=False)
 
 def load_complaints():
     try:
-        df = pd.read_csv(COMPLAINT_FILE)
-        return df
+        return pd.read_csv(COMPLAINT_FILE)
     except:
-        df = pd.DataFrame(columns=["ID","Username","Complaint","Category","Urgency","Status"])
-        df.to_csv(COMPLAINT_FILE,index=False)
-        return df
+        return pd.DataFrame(columns=["ID","Username","Complaint","Category","Urgency","Status"])
 
 # ================= EMAIL =================
 def send_email(complaint, category, urgency):
@@ -77,18 +119,18 @@ Urgency: {urgency}
     server.quit()
 
 # ================= NLP =================
-model = pickle.load(open("model.pkl","rb"))
-vectorizer = pickle.load(open("vectorizer.pkl","rb"))
+model = pickle.load(open("model.pkl", "rb"))
+vectorizer = pickle.load(open("vectorizer.pkl", "rb"))
 stemmer = PorterStemmer()
 
 def clean_text(text):
-    text = re.sub("[^a-zA-Z]"," ",text).lower()
+    text = re.sub("[^a-zA-Z]", " ", text).lower()
     words = [stemmer.stem(w) for w in text.split() if w not in stopwords.words("english")]
     return " ".join(words)
 
 def get_urgency(text):
     text = text.lower()
-    critical = ["no water","no electricity","broken","emergency","not working","too high"]
+    critical = ["no water", "no electricity", "broken", "emergency", "not working"]
     for c in critical:
         if c in text:
             return "High"
@@ -108,12 +150,12 @@ if "login" not in st.session_state:
 
 users = pd.read_csv(USERS_FILE)
 
-# ================= LOGIN =================
+# ================= LOGIN PAGE =================
 if not st.session_state.login:
-    st.title("🔐 Smart Complaint Login")
+    st.title("🎓 Smart Complaint System")
 
     role_choice = st.radio("Who are you?", ["Student", "Admin"])
-    action = st.radio("Choose", ["Login","Register"])
+    action = st.radio("Choose Action", ["Login", "Register"])
 
     if action == "Login":
         u = st.text_input("Username")
@@ -126,18 +168,18 @@ if not st.session_state.login:
                 (users["role"].str.lower() == role_choice.lower())
             ]
 
-            if len(user) > 0:
+            if not user.empty:
                 st.session_state.login = True
                 st.session_state.username = u
                 st.session_state.role = role_choice.lower()
                 st.rerun()
             else:
-                st.error("Invalid username, password, or role")
+                st.error("Invalid credentials")
 
-    else:  # Register
+    else:
         u = st.text_input("Create Username")
         p = st.text_input("Create Password", type="password")
-        r = st.selectbox("Role", ["student","admin"])
+        r = st.selectbox("Role", ["student", "admin"])
 
         if st.button("Register"):
             if u in users["username"].values:
@@ -148,16 +190,14 @@ if not st.session_state.login:
                     "password": p,
                     "role": r
                 }])], ignore_index=True)
-                users.to_csv(USERS_FILE,index=False)
-                st.success("Account created. Now login.")
+                users.to_csv(USERS_FILE, index=False)
+                st.success("Registered successfully. Please login.")
 
 # ================= DASHBOARD =================
 else:
-    st.sidebar.success(f"Logged in as {st.session_state.username}")
+    st.sidebar.success(f"👤 {st.session_state.username}")
     if st.sidebar.button("Logout"):
-        st.session_state.login=False
-        st.session_state.username=""
-        st.session_state.role=""
+        st.session_state.login = False
         st.rerun()
 
     df = load_complaints()
@@ -165,13 +205,13 @@ else:
     # ---------- STUDENT ----------
     if st.session_state.role == "student":
         st.markdown("""
-        <div class="card">
+        <div class="card student-card">
             <div class="metric">🧑‍🎓 Student Dashboard</div>
-            <div class="label">Submit and track your complaints</div>
+            <div class="label">Submit & track your complaints</div>
         </div>
         """, unsafe_allow_html=True)
 
-        complaint = st.text_area("Enter complaint")
+        complaint = st.text_area("Enter your complaint")
 
         if st.button("Submit Complaint"):
             if complaint.strip() == "":
@@ -182,20 +222,17 @@ else:
                 urgency = get_urgency(complaint)
 
                 new_id = len(df) + 1
-                df = pd.concat([df, pd.DataFrame([{
-                    "ID": new_id,
-                    "Username": st.session_state.username,
-                    "Complaint": complaint,
-                    "Category": category,
-                    "Urgency": urgency,
-                    "Status": "Pending"
-                }])], ignore_index=True)
+                df.loc[len(df)] = [
+                    new_id,
+                    st.session_state.username,
+                    complaint,
+                    category,
+                    urgency,
+                    "Pending"
+                ]
 
-                df.to_csv(COMPLAINT_FILE,index=False)
-
-                st.success("Complaint submitted")
-                st.write("Category:", category)
-                st.write("Urgency:", urgency)
+                df.to_csv(COMPLAINT_FILE, index=False)
+                st.success("Complaint submitted successfully")
 
                 if urgency == "High":
                     send_email(complaint, category, urgency)
@@ -207,37 +244,35 @@ else:
     # ---------- ADMIN ----------
     else:
         st.markdown("""
-        <div class="card">
-            <div class="metric">🧑‍💼 Admin Control Panel</div>
-            <div class="label">Monitor and resolve student complaints</div>
+        <div class="card admin-card">
+            <div class="metric">🧑‍💼 Admin Dashboard</div>
+            <div class="label">Manage and resolve complaints</div>
         </div>
         """, unsafe_allow_html=True)
 
         col1, col2, col3 = st.columns(3)
-        col1.metric("Total Complaints", len(df))
-        col2.metric("High Urgency", len(df[df["Urgency"]=="High"]))
-        col3.metric("Pending", len(df[df["Status"]=="Pending"]))
+        col1.metric("Total", len(df))
+        col2.metric("High Urgency", len(df[df["Urgency"] == "High"]))
+        col3.metric("Pending", len(df[df["Status"] == "Pending"]))
 
-        for i in range(len(df)):
+        for i in df.index:
             st.write("----")
-            st.write("User:", df.loc[i,"Username"])
-            st.write("Complaint:", df.loc[i,"Complaint"])
-            st.write("Category:", df.loc[i,"Category"])
-            st.write("Urgency:", df.loc[i,"Urgency"])
+            st.write("👤 User:", df.loc[i,"Username"])
+            st.write("📄 Complaint:", df.loc[i,"Complaint"])
+            st.write("📌 Category:", df.loc[i,"Category"])
+            st.write("⚠️ Urgency:", df.loc[i,"Urgency"])
 
-            status = st.selectbox(
+            df.loc[i,"Status"] = st.selectbox(
                 "Status",
-                ["Pending","In Progress","Solved"],
+                ["Pending", "In Progress", "Solved"],
                 index=["Pending","In Progress","Solved"].index(df.loc[i,"Status"]),
                 key=f"status_{i}"
             )
 
-            df.loc[i,"Status"] = status
+        df.to_csv(COMPLAINT_FILE, index=False)
 
-        df.to_csv(COMPLAINT_FILE,index=False)
-
-        st.subheader("📊 Analytics")
+        st.subheader("📊 Category Analytics")
         st.bar_chart(df["Category"].value_counts())
 
-        st.subheader("🚨 High Urgency")
-        st.dataframe(df[df["Urgency"]=="High"], use_container_width=True)
+        st.subheader("🚨 High Urgency Complaints")
+        st.dataframe(df[df["Urgency"] == "High"], use_container_width=True)
