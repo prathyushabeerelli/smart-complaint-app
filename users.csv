@@ -1,4 +1,3 @@
 username,password,role
 admin,admin123,admin
-hod,hod123,admin
-student1,1234,student
+student1,student123,student
