@@ -52,6 +52,11 @@ streamlit run app.py
 - AI chatbot integration
 - Advanced analytics dashboard
 - Voice-based complaint submission
+  
+- ##  Live Demo
+
+ [View Live Project](https://college-complaints.streamlit.app/)
+
 
 ## Author
 
